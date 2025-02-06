@@ -1,0 +1,3 @@
+instabot
+   python-telegram-bot
+   python-dotenv
