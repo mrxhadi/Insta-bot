@@ -1,7 +1,11 @@
 from instabot import Bot
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
+from dotenv import load_dotenv
 import os
+
+# بارگذاری متغیرهای محیطی از فایل .env
+load_dotenv()
 
 # تنظیمات اینستاگرام
 INSTA_USERNAME = os.getenv("INSTA_USERNAME")
@@ -43,5 +47,6 @@ def main() -> None:
     updater.start_polling()
     updater.idle()
 
-if __name__ == '__main__':
+if name == 'main':
+    print("ربات در حال اجراست...")
     main()
