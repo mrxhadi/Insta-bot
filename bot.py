@@ -9,26 +9,26 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
 from dotenv import load_dotenv
 import time
 
-# تنظیم لاگ‌گیری برای بررسی مشکلات
+# Logging setup
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# بارگذاری متغیرهای محیطی
+# Load environment variables
 load_dotenv()
 
 INSTA_USERNAME = os.getenv("INSTA_USERNAME")
 INSTA_PASSWORD = os.getenv("INSTA_PASSWORD")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-PORT = int(os.getenv("PORT", 8000))  # حل مشکل "No open ports found"
+PORT = int(os.getenv("PORT", 8000))  # Fix "No open ports found" error
 
 if not INSTA_USERNAME or not INSTA_PASSWORD or not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ لطفاً متغیرهای محیطی `INSTA_USERNAME`، `INSTA_PASSWORD` و `TELEGRAM_TOKEN` را در تنظیمات Render اضافه کنید.")
+    raise ValueError("⚠️ Please set `INSTA_USERNAME`, `INSTA_PASSWORD`, and `TELEGRAM_TOKEN` in Render settings.")
 
-# ایجاد سرور فیک برای حل مشکل پورت در Render
+# Flask fake server to bypass Render's open port requirement
 app = Flask(__name__)
 
 @app.route('/')
@@ -38,22 +38,21 @@ def home():
 def run_flask():
     app.run(host='0.0.0.0', port=PORT)
 
-# اجرای Flask در یک Thread جداگانه
 flask_thread = threading.Thread(target=run_flask)
 flask_thread.start()
 
-# تنظیم Selenium WebDriver
+# Selenium WebDriver setup
 def get_driver():
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # بدون باز شدن مرورگر
+    options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# ورود به اینستاگرام و بررسی وضعیت لاگین
+# Instagram login and status check
 def login_to_instagram(driver):
-    logging.info("🔄 در حال ورود به اینستاگرام...")
+    logging.info("🔄 Logging into Instagram...")
     driver.get("https://www.instagram.com/accounts/login/")
     time.sleep(5)
 
@@ -64,58 +63,113 @@ def login_to_instagram(driver):
     password_input.send_keys(INSTA_PASSWORD)
     password_input.send_keys(Keys.RETURN)
 
-    time.sleep(10)  # صبر برای ورود
+    time.sleep(10)
 
-    # بررسی اینکه آیا ورود موفق بوده
+    # Check login status
     current_url = driver.current_url
     if "challenge" in current_url:
-        logging.error("⚠️ اینستاگرام درخواست تأیید (Challenge) داده! لطفاً ورود را از طریق ایمیل یا پیامک تأیید کنید.")
+        logging.error("⚠️ Instagram requested verification! Please confirm via email or SMS.")
+        return "Verification required!"
     elif "login" in current_url:
-        logging.error("❌ ورود به اینستاگرام ناموفق بود. لطفاً یوزرنیم و پسورد را بررسی کنید.")
+        logging.error("❌ Instagram login failed. Check username and password.")
+        return "Login failed!"
     else:
-        logging.info("✅ ورود به اینستاگرام موفقیت‌آمیز بود!")
+        logging.info("✅ Successfully logged into Instagram!")
+        return "Logged in successfully!"
 
-# دستور `/start`
+# Telegram bot setup
+bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+
+# Command: /start with inline buttons
 async def start(update: Update, context: CallbackContext) -> None:
-    logging.info("✅ دستور /start اجرا شد.")
-    await update.message.reply_text("✅ سلام! به ربات مدیریت اینستاگرام خوش آمدید.\nدستورات:\n/start - شروع\n/post - ارسال عکس")
+    logging.info("✅ /start command received.")
+    keyboard = [
+        [InlineKeyboardButton("📸 Upload Photo", callback_data="upload")],
+        [InlineKeyboardButton("🔍 Check Status", callback_data="status")],
+        [InlineKeyboardButton("❓ Help", callback_data="help")],
+        [InlineKeyboardButton("🚫 Cancel", callback_data="cancel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("✅ Welcome! Use the buttons below:", reply_markup=reply_markup)
 
-# دستور `/post` برای ارسال عکس
+# Command: /post (upload photo)
 async def post_photo(update: Update, context: CallbackContext) -> None:
     try:
         if not update.message.photo:
-            await update.message.reply_text("⚠️ لطفاً یک عکس ارسال کنید.")
+            await update.message.reply_text("⚠️ Please send a photo.")
             return
 
-        # دریافت فایل عکس
         photo = update.message.photo[-1]
         file = await context.bot.get_file(photo.file_id)
 
-        # دانلود عکس
         photo_path = "temp_photo.jpg"
         await file.download_to_drive(photo_path)
 
-        logging.info(f"✅ عکس با موفقیت ذخیره شد: {photo_path}")
-        await update.message.reply_text(f"✅ عکس با موفقیت ذخیره شد: `{photo_path}`")
+        logging.info(f"✅ Photo saved: {photo_path}")
+        await update.message.reply_text(f"✅ Photo received and saved: `{photo_path}`")
 
-        # ورود به اینستاگرام و آپلود عکس
-        driver = get_driver()
-        login_to_instagram(driver)
-
-        # اینجا می‌تونی کد آپلود به اینستاگرام رو اضافه کنی
-        logging.info("🚀 آماده برای آپلود عکس به اینستاگرام...")
-
-        driver.quit()
-        os.remove(photo_path)  # حذف فایل بعد از استفاده
+        os.remove(photo_path)
 
     except Exception as e:
-        logging.error(f"⚠️ خطا در پردازش عکس: {e}")
-        await update.message.reply_text(f"⚠️ خطا در پردازش عکس: {e}")
+        logging.error(f"⚠️ Error processing photo: {e}")
+        await update.message.reply_text(f"⚠️ Error: {e}")
 
-# ایجاد بات تلگرام
-bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+# Command: /caption (set caption)
+async def set_caption(update: Update, context: CallbackContext) -> None:
+    caption = " ".join(context.args)
+    if not caption:
+        await update.message.reply_text("⚠️ Please provide a caption!")
+    else:
+        context.user_data["caption"] = caption
+        await update.message.reply_text(f"✅ Caption set to: {caption}")
+
+# Command: /status (check Instagram login status)
+async def check_status(update: Update, context: CallbackContext) -> None:
+    driver = get_driver()
+    status = login_to_instagram(driver)
+    driver.quit()
+    await update.message.reply_text(f"🔍 Instagram Login Status: {status}")
+
+# Command: /help (show available commands)
+async def help_command(update: Update, context: CallbackContext) -> None:
+    help_text = """
+✅ Available Commands:
+- /start - Start the bot
+- /post - Send a photo
+- /caption <text> - Set caption for the next post
+- /status - Check Instagram login status
+- /cancel - Cancel current action
+"""
+    await update.message.reply_text(help_text)
+
+# Command: /cancel (cancel operation)
+async def cancel_command(update: Update, context: CallbackContext) -> None:
+    context.user_data.clear()
+    await update.message.reply_text("🚫 Action canceled.")
+
+# Inline button handlers
+async def button_handler(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "upload":
+        await query.message.reply_text("📸 Please send a photo to upload.")
+    elif query.data == "status":
+        await check_status(update, context)
+    elif query.data == "help":
+        await help_command(update, context)
+    elif query.data == "cancel":
+        await cancel_command(update, context)
+
+# Register handlers
 bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(CommandHandler("post", post_photo))
+bot_app.add_handler(CommandHandler("caption", set_caption))
+bot_app.add_handler(CommandHandler("status", check_status))
+bot_app.add_handler(CommandHandler("help", help_command))
+bot_app.add_handler(CommandHandler("cancel", cancel_command))
 bot_app.add_handler(MessageHandler(filters.PHOTO, post_photo))
+bot_app.add_handler(CallbackQueryHandler(button_handler))
 
-logging.info("✅ ربات تلگرام در حال اجراست...")
+logging.info("✅ Telegram bot is running...")
 bot_app.run_polling()
