@@ -51,32 +51,33 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# ورود به اینستاگرام و بررسی وضعیت لاگین
+# بررسی وضعیت لاگین اینستاگرام
 def login_to_instagram(driver):
-    logging.info("🔄 Logging into Instagram...")
+    logging.info("🔄 Checking Instagram login status...")
     driver.get("https://www.instagram.com/accounts/login/")
     time.sleep(5)
 
-    username_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username")))
-    password_input = driver.find_element(By.NAME, "password")
+    try:
+        if "login" in driver.current_url:
+            logging.error("❌ Instagram login failed. Check username and password.")
+            return "Login failed!"
+        
+        if "challenge" in driver.current_url:
+            logging.error("⚠️ Instagram requested verification! Please confirm via email or SMS.")
+            return "Verification required!"
 
-    username_input.send_keys(INSTA_USERNAME)
-    password_input.send_keys(INSTA_PASSWORD)
-    password_input.send_keys(Keys.RETURN)
+        driver.get("https://www.instagram.com/")
+        time.sleep(5)
 
-    time.sleep(10)
+        if "instagram.com" in driver.current_url:
+            logging.info("✅ Successfully logged into Instagram!")
+            return "Logged in successfully!"
+        else:
+            return "Unknown error occurred!"
 
-    # بررسی اینکه آیا ورود موفق بوده
-    current_url = driver.current_url
-    if "challenge" in current_url:
-        logging.error("⚠️ Instagram requested verification! Please confirm via email or SMS.")
-        return "Verification required!"
-    elif "login" in current_url:
-        logging.error("❌ Instagram login failed. Check username and password.")
-        return "Login failed!"
-    else:
-        logging.info("✅ Successfully logged into Instagram!")
-        return "Logged in successfully!"
+    except Exception as e:
+        logging.error(f"⚠️ Error checking login status: {e}")
+        return "Error checking login status!"
 
 # ارسال عکس در اینستاگرام
 def upload_photo(photo_path, caption="This is a viral post!"):
@@ -186,9 +187,18 @@ bot_app.add_handler(MessageHandler(filters.PHOTO, post_photo))
 
 logging.info("✅ Telegram bot is running...")
 
-# راه‌اندازی بات و ثبت دستورات
+# اجرای بات به صورت دائمی و جلوگیری از کرش شدن
 async def start_bot():
-    await set_bot_commands(bot_app)
-    bot_app.run_polling(drop_pending_updates=True)
+    try:
+        await set_bot_commands(bot_app)
+        while True:
+            logging.info("✅ Bot is running...")
+            await bot_app.run_polling(drop_pending_updates=True)
+            await asyncio.sleep(1)
+    except Exception as e:
+        logging.error(f"⚠️ Bot encountered an error: {e}")
+        await asyncio.sleep(5)
+        asyncio.create_task(start_bot())
 
-asyncio.run(start_bot())
+asyncio.create_task(start_bot())
+asyncio.get_event_loop().run_forever()
