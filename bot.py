@@ -1,8 +1,9 @@
 from instabot import Bot
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from dotenv import load_dotenv
 import os
+import asyncio
 
 # بارگذاری متغیرهای محیطی از فایل .env
 load_dotenv()
@@ -14,39 +15,51 @@ INSTA_PASSWORD = os.getenv("INSTA_PASSWORD")  # پسورد اینستاگرام
 # تنظیمات تلگرام
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # توکن ربات تلگرام
 
-# ربات اینستاگرام
+# بررسی مقدار متغیرها
+if not INSTA_USERNAME or not INSTA_PASSWORD or not TELEGRAM_TOKEN:
+    raise ValueError("لطفاً متغیرهای محیطی INSTA_USERNAME، INSTA_PASSWORD و TELEGRAM_TOKEN را تنظیم کنید.")
+
+# ورود به اینستاگرام
 insta_bot = Bot()
 insta_bot.login(username=INSTA_USERNAME, password=INSTA_PASSWORD)
 
-# دستور شروع در تلگرام
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('سلام! به ربات مدیریت اینستاگرام خوش آمدید.')
+# دستور /start
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text('سلام! به ربات مدیریت اینستاگرام خوش آمدید.')
 
-# دستور پست کردن عکس در اینستاگرام
-def post_photo(update: Update, context: CallbackContext) -> None:
+# دستور /post برای ارسال عکس به اینستاگرام
+async def post_photo(update: Update, context: CallbackContext) -> None:
     try:
-        # دریافت عکس از کاربر
-        photo_file = update.message.photo[-1].get_file()
+        if not update.message.photo:
+            await update.message.reply_text("لطفاً یک عکس ارسال کنید.")
+            return
+        
+        # دریافت عکس از تلگرام
+        photo_file = await update.message.photo[-1].get_file()
         photo_path = "temp_photo.jpg"
-        photo_file.download(photo_path)
+        await photo_file.download(photo_path)
 
-        # پست کردن عکس در اینستاگرام
+        # ارسال عکس به اینستاگرام
         insta_bot.upload_photo(photo_path, caption="این یک پست وایرال است!")
-        update.message.reply_text("عکس با موفقیت در اینستاگرام پست شد!")
+        await update.message.reply_text("✅ عکس با موفقیت در اینستاگرام پست شد!")
+
+        # حذف فایل موقت
+        os.remove(photo_path)
+        os.remove(photo_path + ".REMOVE_ME")
+        
     except Exception as e:
-        update.message.reply_text(f"خطا در پست کردن عکس: {e}")
+        await update.message.reply_text(f"⚠️ خطا در پست کردن عکس: {e}")
 
-# اجرای ربات تلگرام
-def main() -> None:
-    updater = Updater(TELEGRAM_TOKEN)
-    dispatcher = updater.dispatcher
+# راه‌اندازی ربات تلگرام
+def main():
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("post", post_photo))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, post_photo))
 
-    updater.start_polling()
-    updater.idle()
+    print("✅ ربات تلگرام اجرا شد...")
+    app.run_polling()
 
+# اجرای برنامه
 if name == 'main':
-    print("ربات در حال اجراست...")
     main()
