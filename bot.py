@@ -1,4 +1,4 @@
-haꀷi, [07/02/2025 05:36]
+haꀷi, [07/02/2025 05:43]
 import os
 import threading
 import logging
@@ -24,7 +24,16 @@ load_dotenv()
 INSTA_USERNAME = os.getenv("INSTA_USERNAME")
 INSTA_PASSWORD = os.getenv("INSTA_PASSWORD")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-PORT = int(os.getenv("PORT", 8000))
+
+# بررسی مقدار PORT و تبدیل صحیح آن به عدد
+PORT_ENV = os.getenv("PORT", "8000")  # مقدار را به‌عنوان رشته بخوانید
+try:
+    PORT = int(PORT_ENV)  # سپس به int تبدیل کنید
+except ValueError:
+    logging.error(f"⚠️ Invalid PORT value: {PORT_ENV}. Using default: 8000")
+    PORT = 8000  # مقدار پیش‌فرض در صورت نامعتبر بودن مقدار ورودی
+
+logging.info(f"✅ Using PORT: {PORT}")
 
 if not INSTA_USERNAME or not INSTA_PASSWORD or not TELEGRAM_TOKEN:
     raise ValueError("⚠️ لطفاً متغیرهای INSTA_USERNAME، INSTA_PASSWORD و TELEGRAM_TOKEN را تنظیم کنید.")
@@ -111,12 +120,12 @@ async def set_bot_commands(application):
     ]
     await application.bot.set_my_commands(commands)
 
+haꀷi, [07/02/2025 05:43]
 # ✅ دستور /start
 async def start(update: Update, context: CallbackContext) -> None:
     logging.info("✅ /start command received.")
     await update.message.reply_text("✅ Bot is running! Use /help for available commands.")
 
-haꀷi, [07/02/2025 05:36]
 # ✅ دستور /help
 async def help_command(update: Update, context: CallbackContext) -> None:
     help_text = """
