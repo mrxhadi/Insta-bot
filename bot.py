@@ -16,10 +16,10 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 PORT = int(os.getenv("PORT", 8000))
 
 if not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ لطفاً متغیر `TELEGRAM_TOKEN` را در تنظیمات Render اضافه کنید.")
+    raise ValueError("⚠️ لطفاً متغیر TELEGRAM_TOKEN را در تنظیمات Render اضافه کنید.")
 
 # ایجاد سرور فیک برای حل مشکل پورت در Render
-app = Flask(__name__)
+app = Flask(name)
 
 @app.route('/')
 def home():
@@ -35,12 +35,12 @@ flask_thread.start()
 # ✅ ایجاد بات تلگرام
 bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-# ✅ دستور `/start`
+# ✅ دستور /start
 async def start(update: Update, context: CallbackContext) -> None:
     logging.info("✅ /start command received.")
     await update.message.reply_text("✅ Bot is running! Use /help for available commands.")
 
-# ✅ دستور `/help`
+# ✅ دستور /help
 async def help_command(update: Update, context: CallbackContext) -> None:
     help_text = """
 ✅ Available Commands:
@@ -55,7 +55,7 @@ bot_app.add_handler(CommandHandler("help", help_command))
 
 logging.info("✅ Bot handlers registered successfully.")
 
-# ✅ اجرای دائمی بات و جلوگیری از کرش شدن
+# ✅ اجرای بات با مدیریت asyncio بدون ایجاد مشکل Loop
 async def start_bot():
     try:
         await bot_app.bot.set_my_commands([
@@ -71,8 +71,8 @@ async def start_bot():
     except Exception as e:
         logging.error(f"⚠️ Bot encountered an error: {e}")
         await asyncio.sleep(5)
-        asyncio.create_task(start_bot())
+        await start_bot()  # اجرای مجدد در صورت بروز خطا
 
-# ✅ اجرای بات با استفاده از `run_until_complete` برای جلوگیری از خطای event loop
-loop = asyncio.get_event_loop()
-loop.run_until_complete(start_bot())
+# ✅ حل مشکل Loop: اجرای بات با asyncio.run()
+if name == "main":
+    asyncio.run(start_bot())
