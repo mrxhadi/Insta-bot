@@ -1,8 +1,6 @@
 import os
-
-# تنظیم دستی یک مقدار برای PORT تا Render به مشکل نخوره
-os.environ["PORT"] = "8000"
-
+import threading
+from flask import Flask
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -21,11 +19,26 @@ load_dotenv()
 INSTA_USERNAME = os.getenv("INSTA_USERNAME")
 INSTA_PASSWORD = os.getenv("INSTA_PASSWORD")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+PORT = int(os.getenv("PORT", 8000))
 
 if not INSTA_USERNAME or not INSTA_PASSWORD or not TELEGRAM_TOKEN:
     raise ValueError("لطفاً متغیرهای محیطی را تنظیم کنید.")
 
-# راه‌اندازی Selenium با شبیه‌سازی نسخه موبایل
+# سرور فیک برای حل مشکل Render
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=PORT)
+
+# اجرای Flask در یک Thread جداگانه
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.start()
+
+# تنظیم Selenium WebDriver
 def get_driver():
     options = webdriver.ChromeOptions()
     mobile_emulation = {
