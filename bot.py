@@ -1,3 +1,4 @@
+haꀷi, [07/02/2025 05:36]
 import os
 import threading
 import logging
@@ -15,7 +16,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 from dotenv import load_dotenv
 import time
 
-# تنظیم لاگ‌گیری برای بررسی مشکلات
+# تنظیم لاگ‌گیری
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 # بارگذاری متغیرهای محیطی
@@ -26,10 +27,10 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 PORT = int(os.getenv("PORT", 8000))
 
 if not INSTA_USERNAME or not INSTA_PASSWORD or not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ لطفاً متغیرهای `INSTA_USERNAME`، `INSTA_PASSWORD` و `TELEGRAM_TOKEN` را تنظیم کنید.")
+    raise ValueError("⚠️ لطفاً متغیرهای INSTA_USERNAME، INSTA_PASSWORD و TELEGRAM_TOKEN را تنظیم کنید.")
 
 # ایجاد سرور فیک برای حل مشکل پورت در Render
-app = Flask(__name__)
+app = Flask(name)
 
 @app.route('/')
 def home():
@@ -38,7 +39,6 @@ def home():
 def run_flask():
     app.run(host='0.0.0.0', port=PORT)
 
-# اجرای Flask در یک Thread جداگانه
 flask_thread = threading.Thread(target=run_flask)
 flask_thread.start()
 
@@ -111,12 +111,13 @@ async def set_bot_commands(application):
     ]
     await application.bot.set_my_commands(commands)
 
-# ✅ دستور `/start`
+# ✅ دستور /start
 async def start(update: Update, context: CallbackContext) -> None:
     logging.info("✅ /start command received.")
     await update.message.reply_text("✅ Bot is running! Use /help for available commands.")
 
-# ✅ دستور `/help`
+haꀷi, [07/02/2025 05:36]
+# ✅ دستور /help
 async def help_command(update: Update, context: CallbackContext) -> None:
     help_text = """
 ✅ Available Commands:
@@ -128,7 +129,7 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 """
     await update.message.reply_text(help_text)
 
-# ✅ دستور `/post`
+# ✅ دستور /post
 async def post_photo(update: Update, context: CallbackContext) -> None:
     try:
         if not update.message.photo:
@@ -142,7 +143,7 @@ async def post_photo(update: Update, context: CallbackContext) -> None:
         await file.download_to_drive(photo_path)
 
         logging.info(f"✅ Photo saved: {photo_path}")
-        await update.message.reply_text(f"✅ Photo received and saved: `{photo_path}`")
+        await update.message.reply_text(f"✅ Photo received and saved: {photo_path}")
 
         upload_status = upload_photo(photo_path)
         await update.message.reply_text(upload_status)
@@ -153,14 +154,14 @@ async def post_photo(update: Update, context: CallbackContext) -> None:
         logging.error(f"⚠️ Error processing photo: {e}")
         await update.message.reply_text(f"⚠️ Error: {e}")
 
-# ✅ دستور `/status`
+# ✅ دستور /status
 async def check_status(update: Update, context: CallbackContext) -> None:
     driver = get_driver()
     status = login_to_instagram(driver)
     driver.quit()
     await update.message.reply_text(f"🔍 Instagram Login Status: {status}")
 
-# ✅ دستور `/cancel`
+# ✅ دستور /cancel
 async def cancel_command(update: Update, context: CallbackContext) -> None:
     context.user_data.clear()
     await update.message.reply_text("🚫 Action canceled.")
@@ -173,20 +174,4 @@ bot_app.add_handler(CommandHandler("help", help_command))
 bot_app.add_handler(CommandHandler("cancel", cancel_command))
 bot_app.add_handler(MessageHandler(filters.PHOTO, post_photo))
 
-logging.info("✅ Telegram bot is running...")
-
-# ✅ اجرای بات بدون مشکل Loop
-async def start_bot():
-    try:
-        await set_bot_commands(bot_app)
-        while True:
-            logging.info("✅ Bot is running and waiting for messages...")
-            await bot_app.run_polling(drop_pending_updates=True)
-            await asyncio.sleep(1)
-    except Exception as e:
-        logging.error(f"⚠️ Bot encountered an error: {e}")
-        await asyncio.sleep(5)
-        await start_bot()
-
-if __name__ == "__main__":
-    asyncio.run(start_bot())
+logging.info("✅ Telegram bot is ready.")
