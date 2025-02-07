@@ -1,6 +1,6 @@
 from instabot import Bot
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, Messagehandler, Filters CallbackContext
 from dotenv import load_dotenv
 import os
 
@@ -47,6 +47,6 @@ def main() -> None:
     updater.start_polling()
     updater.idle()
 
-if name == 'main':
+if __name__ == '__main__':
     print("ربات در حال اجراست...")
     main()
